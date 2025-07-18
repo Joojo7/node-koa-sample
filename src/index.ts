@@ -5,7 +5,7 @@ import Router from '@koa/router';
 const app = new Koa();
 const router = new Router();
 
-router.get('/', async (ctx) => {
+router.get('/page', async (ctx) => {
   ctx.body = `
     <html>
       <head>
@@ -19,6 +19,10 @@ router.get('/', async (ctx) => {
       </body>
     </html>
   `;
+});
+
+router.get('/', async (ctx) => {
+  ctx.body = {message: "Hello from Koa"}
 });
 
 app.use(router.routes()).use(router.allowedMethods());
