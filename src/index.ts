@@ -23,7 +23,7 @@ router.get('/', async (ctx) => {
 
 app.use(router.routes()).use(router.allowedMethods());
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
   console.log(`🚀 Koa server running at http://localhost:${PORT}`);
 });
