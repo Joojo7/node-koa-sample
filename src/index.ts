@@ -1,33 +1,195 @@
-// src/index.ts
 import Koa from 'koa';
-import Router from '@koa/router';
+import Router from 'koa-router';
+import bodyParser from 'koa-bodyparser';
+import jwt from 'jsonwebtoken';
+import bcrypt from 'bcryptjs';
+import dotenv from 'dotenv';
+import User from './models/user';
+import Note from './models/note';
+
+dotenv.config();
+
+
 
 const app = new Koa();
 const router = new Router();
 
-router.get('/page', async (ctx) => {
-  ctx.body = `
-    <html>
-      <head>
-        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-      </head>
-      <body class="p-5">
-        <div class="container">
-          <h1 class="text-primary">Hello from Koa + Bootstrap</h1>
-          <button class="btn btn-success">Click me</button>
-        </div>
-      </body>
-    </html>
-  `;
+// Define types for the JWT payload
+interface JwtPayload {
+  id: number;
+  username: string;
+}
+
+const JWT_SECRET = process.env.JWT_SECRET || 'default_secret' as string;;
+const JWT_EXPIRATION = process.env.JWT_EXPIRATION || '15m';
+
+// Define the types for the request body in login and notes
+interface LoginRequest {
+  username: string;
+  password: string;
+}
+
+interface CreateNoteRequest {
+  title: string;
+  content: string;
+}
+
+interface UpdateNoteRequest {
+  title?: string;
+  content?: string;
+}
+
+// Middleware to check JWT
+async function authenticate(ctx: any, next: any) {
+  const authorizationHeader = ctx.headers['authorization'];
+
+  if (!authorizationHeader) {
+    ctx.status = 403;
+    ctx.body = 'Token is required.';
+    return;
+  }
+
+  const token = authorizationHeader.split(' ')[1];  // Get token from 'Bearer <token>'
+
+  if (!token) {
+    ctx.status = 403;
+    ctx.body = 'Token is required.';
+    return;
+  }
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload;
+    ctx.state.user = decoded; // Store user info in state
+    await next();
+  } catch (error) {
+    console.log('error:', error);
+    ctx.status = 401;
+    ctx.body = 'Invalid or expired token.';
+  }
+}
+
+
+// Create a new user (signup)
+router.post('/signup', async (ctx) => {
+  const { username, password }: LoginRequest = ctx.request.body as LoginRequest;
+
+  const hashedPassword = await bcrypt.hash(password, 10);
+
+  try {
+    const user = await User.create({ username, password: hashedPassword });
+    ctx.status = 201;
+    ctx.body = { message: 'User created', user: { username: user.username, id: user.id } };
+  } catch (err) {
+    console.log('err:', err)
+    ctx.status = 500;
+    ctx.body = { error: err};
+  }
 });
 
-router.get('/', async (ctx) => {
-  ctx.body = {message: "Hello from Koa"}
+// Login route to generate JWT
+router.post('/login', async (ctx) => {
+  const { username, password }: LoginRequest = ctx.request.body as LoginRequest;
+
+  const user = await User.findOne({ where: { username } });
+
+  if (!user || !(await bcrypt.compare(password, user.password))) {
+    ctx.status = 401;
+    ctx.body = 'Invalid credentials';
+    return;
+  }
+
+  // @ts-ignore: Ignore type error for jwt.sign method
+  const token = jwt.sign({ id: user.id, username: user.username }, JWT_SECRET, {
+    expiresIn: JWT_EXPIRATION,
+  });
+
+  ctx.body = { token };
 });
 
+// Create a new note (only authenticated users)
+router.post('/notes', authenticate, async (ctx) => {
+  const { title, content }: CreateNoteRequest = ctx.request.body as CreateNoteRequest;
+  const { id } = ctx.state.user;
+
+  try {
+    const note = await Note.create({ title, content, userId: id });
+    ctx.status = 201;
+    ctx.body = note;
+  } catch (error) {
+    ctx.status = 500;
+    ctx.body = { error: 'Error creating note' };
+  }
+});
+
+// Get all notes for the logged-in user
+router.get('/notes', authenticate, async (ctx) => {
+  const { id } = ctx.state.user;
+
+  try {
+    const notes = await Note.findAll({ where: { userId: id } });
+    ctx.status = 200;
+    ctx.body = notes;
+  } catch (error) {
+    ctx.status = 500;
+    ctx.body = { error: 'Error fetching notes' };
+  }
+});
+
+// Update a note
+router.put('/notes/:id', authenticate, async (ctx) => {
+  const { id } = ctx.state.user;
+  const noteId = ctx.params.id;
+  const { title, content }: UpdateNoteRequest = ctx.request.body as UpdateNoteRequest;
+
+  try {
+    const note = await Note.findOne({ where: { id: noteId, userId: id } });
+    if (!note) {
+      ctx.status = 404;
+      ctx.body = { error: 'Note not found' };
+      return;
+    }
+
+    note.title = title || note.title;
+    note.content = content || note.content;
+    await note.save();
+
+    ctx.status = 200;
+    ctx.body = note;
+  } catch (error) {
+    ctx.status = 500;
+    ctx.body = { error: 'Error updating note' };
+  }
+});
+
+// Delete a note
+router.delete('/notes/:id', authenticate, async (ctx) => {
+  const { id } = ctx.state.user;
+  const noteId = ctx.params.id;
+
+  try {
+    const note = await Note.findOne({ where: { id: noteId, userId: id } });
+    if (!note) {
+      ctx.status = 404;
+      ctx.body = { error: 'Note not found' };
+      return;
+    }
+
+    await note.destroy();
+
+    ctx.status = 200;
+    ctx.body = { message: 'Note deleted' };
+  } catch (error) {
+    ctx.status = 500;
+    ctx.body = { error: 'Error deleting note' };
+  }
+});
+
+// Apply routes to the app
+app.use(bodyParser());
 app.use(router.routes()).use(router.allowedMethods());
 
-const PORT = process.env.PORT || 8080;
-app.listen(PORT, () => {
-  console.log(`🚀 Koa server running at http://localhost:${PORT}`);
+// Start the Koa server
+const port = process.env.PORT || 8000;
+app.listen(port, () => {
+  console.log(`Server is running on port ${port}`);
 });
