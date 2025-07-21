@@ -68,6 +68,17 @@ async function authenticate(ctx: any, next: any) {
   }
 }
 
+router.get('/test', async (ctx) => {
+  try {
+    ctx.status = 201;
+    ctx.body = { message: "Hello Plannet", };
+  } catch (err) {
+    console.log('err:', err)
+    ctx.status = 500;
+    ctx.body = { error: err};
+  }
+});
+
 
 // Create a new user (signup)
 router.post('/signup', async (ctx) => {
