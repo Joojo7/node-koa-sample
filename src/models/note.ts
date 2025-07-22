@@ -1,8 +1,9 @@
 import { DataTypes, Model, Optional } from 'sequelize';
 import sequelize from './db';
+import { v4 as uuidv4 } from 'uuid';  // Import uuid to generate unique IDs
 
 interface NoteAttributes {
-  id: number;
+  id: string;  // UUID will be a string
   title: string;
   content: string;
   userId: number;
@@ -11,7 +12,7 @@ interface NoteAttributes {
 interface NoteCreationAttributes extends Optional<NoteAttributes, 'id'> {}
 
 class Note extends Model<NoteAttributes, NoteCreationAttributes> implements NoteAttributes {
-  public id!: number;
+  public id!: string;
   public title!: string;
   public content!: string;
   public userId!: number;
@@ -20,9 +21,9 @@ class Note extends Model<NoteAttributes, NoteCreationAttributes> implements Note
 Note.init(
   {
     id: {
-      type: DataTypes.INTEGER,
+      type: DataTypes.UUID,
       primaryKey: true,
-      autoIncrement: true,
+      defaultValue: uuidv4,  // Automatically generate a UUID v4 for the ID
     },
     title: {
       type: DataTypes.STRING,

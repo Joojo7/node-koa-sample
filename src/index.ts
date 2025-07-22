@@ -6,10 +6,9 @@ import bcrypt from 'bcryptjs';
 import dotenv from 'dotenv';
 import User from './models/user';
 import Note from './models/note';
+import cors from '@koa/cors';
 
 dotenv.config();
-
-
 
 const app = new Koa();
 const router = new Router();
@@ -68,10 +67,39 @@ async function authenticate(ctx: any, next: any) {
   }
 }
 
+
+// CORS configuration
+const corsOptions: cors.Options = {
+  origin: (ctx: Koa.Context) => {
+    const origin = ctx.request.header.origin;
+    // Allow both local and production domains
+    if (origin === 'http://localhost:3000' || origin === 'https://joojodontoh.online') {
+      return origin;
+    }
+    return 'undefined';
+  },
+  allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],  // Allow OPTIONS method for preflight requests
+  allowHeaders: ['Content-Type', 'Authorization'],
+  credentials: true, // Allow credentials (cookies, authorization headers, etc.)
+};
+
+// Apply the CORS middleware
+app.use(cors(corsOptions));
+
+// Handle preflight requests (OPTIONS method)
+app.use(async (ctx, next) => {
+  if (ctx.method === 'OPTIONS') {
+    console.log('Handling preflight request');
+    ctx.status = 200;
+    return;
+  }
+  await next();
+});
+
 router.get('/test', async (ctx) => {
   try {
     ctx.status = 201;
-    ctx.body = { message: "Hello Plannet", };
+    ctx.body = { message: "Hello Planet", };
   } catch (err) {
     console.log('err:', err)
     ctx.status = 500;
@@ -120,17 +148,26 @@ router.post('/login', async (ctx) => {
 // Create a new note (only authenticated users)
 router.post('/notes', authenticate, async (ctx) => {
   const { title, content }: CreateNoteRequest = ctx.request.body as CreateNoteRequest;
-  const { id } = ctx.state.user;
+  const { id } = ctx.state.user; // Authenticated user ID
 
   try {
-    const note = await Note.create({ title, content, userId: id });
+    // Note creation without manually passing the ID (UUID is auto-generated)
+    const note = await Note.create({
+      title,
+      content,
+      userId: id,
+    });
+
+    // Send back the created note (including UUID for the `id`)
     ctx.status = 201;
     ctx.body = note;
   } catch (error) {
+    console.log('error:', error);
     ctx.status = 500;
     ctx.body = { error: 'Error creating note' };
   }
 });
+
 
 // Get all notes for the logged-in user
 router.get('/notes', authenticate, async (ctx) => {
