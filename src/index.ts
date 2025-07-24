@@ -96,7 +96,7 @@ app.use(async (ctx, next) => {
   await next();
 });
 
-router.get('/test', async (ctx) => {
+router.get('/api/test', async (ctx) => {
   try {
     ctx.status = 201;
     ctx.body = { message: "Hello Planet", };
@@ -109,7 +109,7 @@ router.get('/test', async (ctx) => {
 
 
 // Create a new user (signup)
-router.post('/signup', async (ctx) => {
+router.post('/api/signup', async (ctx) => {
   const { username, password }: LoginRequest = ctx.request.body as LoginRequest;
 
   const hashedPassword = await bcrypt.hash(password, 10);
@@ -126,7 +126,7 @@ router.post('/signup', async (ctx) => {
 });
 
 // Login route to generate JWT
-router.post('/login', async (ctx) => {
+router.post('/api/login', async (ctx) => {
   const { username, password }: LoginRequest = ctx.request.body as LoginRequest;
 
   const user = await User.findOne({ where: { username } });
@@ -146,7 +146,7 @@ router.post('/login', async (ctx) => {
 });
 
 // Create a new note (only authenticated users)
-router.post('/notes', authenticate, async (ctx) => {
+router.post('/api/notes', authenticate, async (ctx) => {
   const { title, content }: CreateNoteRequest = ctx.request.body as CreateNoteRequest;
   const { id } = ctx.state.user; // Authenticated user ID
 
@@ -170,7 +170,7 @@ router.post('/notes', authenticate, async (ctx) => {
 
 
 // Get all notes for the logged-in user
-router.get('/notes', authenticate, async (ctx) => {
+router.get('/api/notes', authenticate, async (ctx) => {
   const { id } = ctx.state.user;
 
   try {
@@ -184,7 +184,7 @@ router.get('/notes', authenticate, async (ctx) => {
 });
 
 // Update a note
-router.put('/notes/:id', authenticate, async (ctx) => {
+router.put('/api/notes/:id', authenticate, async (ctx) => {
   const { id } = ctx.state.user;
   const noteId = ctx.params.id;
   const { title, content }: UpdateNoteRequest = ctx.request.body as UpdateNoteRequest;
@@ -210,7 +210,7 @@ router.put('/notes/:id', authenticate, async (ctx) => {
 });
 
 // Delete a note
-router.delete('/notes/:id', authenticate, async (ctx) => {
+router.delete('/api/notes/:id', authenticate, async (ctx) => {
   const { id } = ctx.state.user;
   const noteId = ctx.params.id;
 
