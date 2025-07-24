@@ -73,7 +73,7 @@ const corsOptions: cors.Options = {
   origin: (ctx: Koa.Context) => {
     const origin = ctx.request.header.origin;
     // Allow both local and production domains
-    if (origin === 'http://localhost:3000' || origin === 'https://joojodontoh.online') {
+    if (origin === 'http://localhost:3000' || origin === 'http://localhost' ||origin === 'https://joojodontoh.online' ) {
       return origin;
     }
     return 'undefined';
